@@ -14,7 +14,9 @@ A deterministic, idempotent Markdown normalization plugin for Obsidian. This plu
 
 ### 🗂️ Frontmatter Enforcement
 - Automatically add frontmatter to notes that lack it
-- Customizable frontmatter templates with variables (`{{title}}`, `{{date}}`)
+- Enforces ordered schema: `id`, `title`, `date`, `tags`
+- Customizable frontmatter templates with variables (`{{id}}`, `{{title}}`, `{{date}}`)
+- Deterministic ID generation from file names
 - Validates existing frontmatter structure
 
 ### 📝 Formatting Normalization
@@ -60,9 +62,11 @@ npm run dev
 
 ### Command Palette Commands
 
-1. **Lint current file**: Apply all linting rules to the active file
-2. **Lint all files in vault**: Apply linting rules to all markdown files
-3. **Check current file (dry run)**: Check if current file conforms without making changes
+1. **Normalize: Current file**: Apply all linting rules to the active file
+2. **Normalize: Folder**: Apply linting rules to all markdown files in the current folder
+3. **Normalize: Entire vault**: Apply linting rules to all markdown files in the vault
+4. **Dry run: Current file**: Check if current file conforms without making changes
+5. **Dry run: Entire vault**: Generate a report of all changes that would be made (saved to `/Reports` folder)
 
 ### Settings
 
@@ -81,16 +85,30 @@ The plugin follows a modular architecture with clear separation of concerns:
 main.ts                    # Plugin entry point, command registration
 settings.ts                # Settings interface and defaults
 settingsTab.ts             # Settings UI
-frontmatterEnforcer.ts     # Frontmatter validation and generation
-formattingNormalizer.ts    # Formatting rules
-tagRules.ts                # Tag normalization
-wikilinkInserter.ts        # Wikilink validation and normalization
+engine/
+  normalize.ts             # Orchestrates the linting pipeline
+  frontmatter.ts           # Frontmatter validation and generation (enforces id, title, date, tags schema)
+  format.ts                # Formatting rules (line endings, whitespace, trailing newlines)
+  tags.ts                  # Tag normalization (deterministic formatting)
+  backlinks.ts             # Wikilink validation and normalization (safe backlink insertion)
+  report.ts                # Change summaries and report generation
+  scan.ts                  # Utility helpers for detecting code blocks, headings, links
 ```
 
+### Normalization Pipeline
+
+The linting pipeline applies transformations in a deterministic order:
+
+1. **Frontmatter** → Enforce YAML schema with ordered fields (id, title, date, tags)
+2. **Formatting** → Normalize line endings, remove multiple blank lines, ensure trailing newline
+3. **Tags** → Apply tag formatting rules (lowercase, UPPERCASE, camelCase)
+4. **Wikilinks** → Normalize wikilink paths (shortest, relative, or absolute)
+
 Each module is:
-- **Independent**: Can be enabled/disabled individually
+- **Independent**: Can be enabled/disabled individually via settings
 - **Stateless**: Pure functions based on settings
-- **Testable**: Logic isolated from Obsidian API
+- **Idempotent**: Running multiple times produces the same result
+- **Minimal-diff**: Only changes what's necessary to conform to rules
 
 ## Development
 
