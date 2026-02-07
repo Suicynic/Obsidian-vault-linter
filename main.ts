@@ -1,4 +1,4 @@
-import { App, Editor, MarkdownView, Notice, Plugin, TFile, TFolder } from 'obsidian';
+import { Editor, MarkdownView, Notice, Plugin, TFile, TFolder } from 'obsidian';
 import { VaultLinterSettings, DEFAULT_SETTINGS } from './settings';
 import { VaultLinterSettingTab } from './settingsTab';
 import { NormalizationPipeline } from './engine/normalize';
