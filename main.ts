@@ -217,9 +217,13 @@ export default class VaultLinterPlugin extends Plugin {
 
 		// Ensure Reports folder exists
 		const reportsFolder = 'Reports';
-		const folderExists = this.app.vault.getAbstractFileByPath(reportsFolder);
-		if (!folderExists) {
+		const existingReportsEntry = this.app.vault.getAbstractFileByPath(reportsFolder);
+		if (!existingReportsEntry) {
 			await this.app.vault.createFolder(reportsFolder);
+		} else if (!(existingReportsEntry instanceof TFolder)) {
+			new Notice(`Cannot save vault lint report: '${reportsFolder}' exists and is not a folder.`);
+			console.error(`Vault Linter: '${reportsFolder}' exists and is not a folder. Cannot create reports directory.`);
+			return;
 		}
 
 		// Write report
