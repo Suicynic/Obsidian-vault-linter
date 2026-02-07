@@ -1,54 +1,64 @@
-import { App, Editor, MarkdownView, Notice, Plugin, TFile } from 'obsidian';
+import { App, Editor, MarkdownView, Notice, Plugin, TFile, TFolder } from 'obsidian';
 import { VaultLinterSettings, DEFAULT_SETTINGS } from './settings';
 import { VaultLinterSettingTab } from './settingsTab';
-import { FrontmatterEnforcer } from './frontmatterEnforcer';
-import { FormattingNormalizer } from './formattingNormalizer';
-import { TagRules } from './tagRules';
-import { WikilinkInserter } from './wikilinkInserter';
+import { NormalizationPipeline } from './engine/normalize';
+import { generateChangeReport, formatReportAsMarkdown, formatVaultReportAsMarkdown, ChangeReport } from './engine/report';
 
 export default class VaultLinterPlugin extends Plugin {
 	settings: VaultLinterSettings;
-	frontmatterEnforcer: FrontmatterEnforcer;
-	formattingNormalizer: FormattingNormalizer;
-	tagRules: TagRules;
-	wikilinkInserter: WikilinkInserter;
+	pipeline: NormalizationPipeline;
 
 	async onload() {
 		await this.loadSettings();
 
-		// Initialize linter modules
-		this.frontmatterEnforcer = new FrontmatterEnforcer(this.settings);
-		this.formattingNormalizer = new FormattingNormalizer(this.settings);
-		this.tagRules = new TagRules(this.settings);
-		this.wikilinkInserter = new WikilinkInserter(this.settings);
+		// Initialize normalization pipeline
+		this.pipeline = new NormalizationPipeline(this.settings);
 
 		// Add settings tab
 		this.addSettingTab(new VaultLinterSettingTab(this.app, this));
 
-		// Command: Lint current file
+		// Command: Normalize current file
 		this.addCommand({
-			id: 'lint-current-file',
-			name: 'Lint current file',
+			id: 'normalize-current-file',
+			name: 'Normalize: Current file',
 			editorCallback: (editor: Editor, view: MarkdownView) => {
-				this.lintCurrentFile(editor, view);
+				this.normalizeCurrentFile(editor, view);
 			}
 		});
 
-		// Command: Lint all files in vault
+		// Command: Normalize folder
 		this.addCommand({
-			id: 'lint-all-files',
-			name: 'Lint all files in vault',
-			callback: () => {
-				this.lintAllFiles();
+			id: 'normalize-folder',
+			name: 'Normalize: Folder',
+			callback: async () => {
+				await this.normalizeFolder();
 			}
 		});
 
-		// Command: Check current file (dry run)
+		// Command: Normalize entire vault
 		this.addCommand({
-			id: 'check-current-file',
-			name: 'Check current file (dry run)',
+			id: 'normalize-entire-vault',
+			name: 'Normalize: Entire vault',
+			callback: async () => {
+				await this.normalizeAllFiles();
+			}
+		});
+
+		// Command: Dry run current file
+		this.addCommand({
+			id: 'dry-run-current-file',
+			name: 'Dry run: Current file',
 			editorCallback: (editor: Editor, view: MarkdownView) => {
-				this.checkCurrentFile(editor, view);
+				this.dryRunCurrentFile(editor, view);
+			}
+		});
+
+		// Command: Dry run entire vault
+		this.addCommand({
+			id: 'dry-run-entire-vault',
+			name: 'Dry run: Entire vault',
+			callback: async () => {
+				await this.dryRunEntireVault();
 			}
 		});
 
@@ -66,32 +76,21 @@ export default class VaultLinterPlugin extends Plugin {
 	async saveSettings() {
 		await this.saveData(this.settings);
 		
-		// Reinitialize modules with new settings
-		this.frontmatterEnforcer = new FrontmatterEnforcer(this.settings);
-		this.formattingNormalizer = new FormattingNormalizer(this.settings);
-		this.tagRules = new TagRules(this.settings);
-		this.wikilinkInserter = new WikilinkInserter(this.settings);
+		// Update pipeline with new settings
+		this.pipeline.updateSettings(this.settings);
 	}
 
 	/**
 	 * Apply all linting rules to content
 	 */
 	lintContent(content: string, fileName: string): string {
-		let linted = content;
-
-		// Apply linting modules in order
-		linted = this.frontmatterEnforcer.enforce(linted, fileName);
-		linted = this.formattingNormalizer.normalize(linted);
-		linted = this.tagRules.enforce(linted);
-		linted = this.wikilinkInserter.normalize(linted);
-
-		return linted;
+		return this.pipeline.normalize(content, fileName);
 	}
 
 	/**
-	 * Lint the current file
+	 * Normalize the current file
 	 */
-	async lintCurrentFile(editor: Editor, view: MarkdownView) {
+	async normalizeCurrentFile(editor: Editor, view: MarkdownView) {
 		const file = view.file;
 		if (!file) {
 			new Notice('No active file');
@@ -99,72 +98,175 @@ export default class VaultLinterPlugin extends Plugin {
 		}
 
 		const content = editor.getValue();
-		const linted = this.lintContent(content, file.name);
+		const normalized = this.lintContent(content, file.name);
 
-		if (content === linted) {
+		if (content === normalized) {
 			new Notice('✓ File already conforms to linting rules');
 		} else {
-			editor.setValue(linted);
-			new Notice('✓ File linted successfully');
+			editor.setValue(normalized);
+			new Notice('✓ File normalized successfully');
 		}
 	}
 
 	/**
-	 * Check current file without making changes (dry run)
+	 * Normalize a folder (prompt user to select)
 	 */
-	async checkCurrentFile(editor: Editor, view: MarkdownView) {
-		const file = view.file;
-		if (!file) {
-			new Notice('No active file');
+	async normalizeFolder() {
+		// Get current active file to determine folder
+		const activeFile = this.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice('Please open a file in the folder you want to normalize');
 			return;
 		}
 
-		const content = editor.getValue();
-		const linted = this.lintContent(content, file.name);
-
-		if (content === linted) {
-			new Notice('✓ File conforms to linting rules');
-		} else {
-			new Notice('⚠ File has linting issues (use "Lint current file" to fix)');
+		const folder = activeFile.parent;
+		if (!folder) {
+			new Notice('Cannot determine folder');
+			return;
 		}
-	}
 
-	/**
-	 * Lint all markdown files in the vault
-	 */
-	async lintAllFiles() {
-		const files = this.app.vault.getMarkdownFiles();
-		let lintedCount = 0;
+		const files = this.getMarkdownFilesInFolder(folder);
+		
+		if (files.length === 0) {
+			new Notice('No markdown files found in this folder');
+			return;
+		}
+
+		new Notice(`Starting folder normalization (${files.length} files in ${folder.path})...`);
+
+		let normalizedCount = 0;
 		let errorCount = 0;
-
-		new Notice(`Starting vault linting (${files.length} files)...`);
 
 		for (const file of files) {
 			try {
-				await this.lintFile(file);
-				lintedCount++;
+				await this.normalizeFile(file);
+				normalizedCount++;
 			} catch (error) {
-				console.error(`Error linting ${file.path}:`, error);
+				console.error(`Error normalizing ${file.path}:`, error);
 				errorCount++;
 			}
 		}
 
 		if (errorCount > 0) {
-			new Notice(`✓ Linted ${lintedCount} files (${errorCount} errors)`);
+			new Notice(`✓ Normalized ${normalizedCount} files (${errorCount} errors)`);
 		} else {
-			new Notice(`✓ Successfully linted ${lintedCount} files`);
+			new Notice(`✓ Successfully normalized ${normalizedCount} files in ${folder.path}`);
 		}
 	}
 
 	/**
-	 * Lint a specific file
+	 * Get all markdown files in a folder (not recursive)
 	 */
-	async lintFile(file: TFile) {
-		const content = await this.app.vault.read(file);
-		const linted = this.lintContent(content, file.name);
+	getMarkdownFilesInFolder(folder: TFolder): TFile[] {
+		const files: TFile[] = [];
+		for (const child of folder.children) {
+			if (child instanceof TFile && child.extension === 'md') {
+				files.push(child);
+			}
+		}
+		return files;
+	}
 
-		if (content !== linted) {
-			await this.app.vault.modify(file, linted);
+	/**
+	 * Dry run on current file without making changes
+	 */
+	async dryRunCurrentFile(editor: Editor, view: MarkdownView) {
+		const file = view.file;
+		if (!file) {
+			new Notice('No active file');
+			return;
+		}
+
+		const content = editor.getValue();
+		const normalized = this.lintContent(content, file.name);
+
+		if (content === normalized) {
+			new Notice('✓ File conforms to linting rules');
+		} else {
+			new Notice('⚠ File has linting issues (use "Normalize: Current file" to fix)');
+			
+			// Generate and log report
+			const report = generateChangeReport(file.path, file.name, content, normalized);
+			const markdown = formatReportAsMarkdown(report);
+			console.log(markdown);
+		}
+	}
+
+	/**
+	 * Dry run on entire vault and write report to /Reports
+	 */
+	async dryRunEntireVault() {
+		const files = this.app.vault.getMarkdownFiles();
+		new Notice(`Starting vault dry run (${files.length} files)...`);
+
+		const reports: ChangeReport[] = [];
+
+		for (const file of files) {
+			try {
+				const content = await this.app.vault.read(file);
+				const normalized = this.lintContent(content, file.name);
+				const report = generateChangeReport(file.path, file.name, content, normalized);
+				reports.push(report);
+			} catch (error) {
+				console.error(`Error processing ${file.path}:`, error);
+			}
+		}
+
+		// Generate report markdown
+		const reportMarkdown = formatVaultReportAsMarkdown(reports);
+
+		// Ensure Reports folder exists
+		const reportsFolder = 'Reports';
+		const folderExists = this.app.vault.getAbstractFileByPath(reportsFolder);
+		if (!folderExists) {
+			await this.app.vault.createFolder(reportsFolder);
+		}
+
+		// Write report
+		const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+		const reportFileName = `${reportsFolder}/vault-lint-report-${timestamp}.md`;
+		await this.app.vault.create(reportFileName, reportMarkdown);
+
+		const changedFiles = reports.filter(r => r.changes.length > 0).length;
+		new Notice(`✓ Dry run complete. Report saved to ${reportFileName}\n${changedFiles} files would be changed.`);
+	}
+
+	/**
+	 * Normalize all markdown files in the vault
+	 */
+	async normalizeAllFiles() {
+		const files = this.app.vault.getMarkdownFiles();
+		let normalizedCount = 0;
+		let errorCount = 0;
+
+		new Notice(`Starting vault normalization (${files.length} files)...`);
+
+		for (const file of files) {
+			try {
+				await this.normalizeFile(file);
+				normalizedCount++;
+			} catch (error) {
+				console.error(`Error normalizing ${file.path}:`, error);
+				errorCount++;
+			}
+		}
+
+		if (errorCount > 0) {
+			new Notice(`✓ Normalized ${normalizedCount} files (${errorCount} errors)`);
+		} else {
+			new Notice(`✓ Successfully normalized ${normalizedCount} files`);
+		}
+	}
+
+	/**
+	 * Normalize a specific file
+	 */
+	async normalizeFile(file: TFile) {
+		const content = await this.app.vault.read(file);
+		const normalized = this.lintContent(content, file.name);
+
+		if (content !== normalized) {
+			await this.app.vault.modify(file, normalized);
 		}
 	}
 }

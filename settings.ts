@@ -22,7 +22,7 @@ export interface VaultLinterSettings {
 
 export const DEFAULT_SETTINGS: VaultLinterSettings = {
 	enforceFrontmatter: true,
-	frontmatterTemplate: '---\ntitle: {{title}}\ndate: {{date}}\ntags: []\n---',
+	frontmatterTemplate: '---\nid: {{id}}\ntitle: {{title}}\ndate: {{date}}\ntags: []\n---',
 	normalizeFormatting: true,
 	endWithNewline: true,
 	removeMultipleBlankLines: true,
