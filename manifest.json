@@ -1,0 +1,10 @@
+{
+  "id": "obsidian-vault-linter",
+  "name": "Obsidian Vault Linter",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Deterministic, idempotent Markdown normalization for Obsidian vaults. Enforces frontmatter, formatting, tag rules, and wikilink conventions.",
+  "author": "Suicynic",
+  "authorUrl": "https://github.com/Suicynic",
+  "isDesktopOnly": false
+}
