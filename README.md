@@ -14,10 +14,10 @@ A deterministic, idempotent Markdown normalization plugin for Obsidian. This plu
 
 ### 🗂️ Frontmatter Enforcement
 - Automatically add frontmatter to notes that lack it
-- Enforces ordered schema: `id`, `title`, `date`, `tags`
+- Enforces ordered schema when adding frontmatter: `id`, `title`, `date`, `tags`
 - Customizable frontmatter templates with variables (`{{id}}`, `{{title}}`, `{{date}}`)
 - Deterministic ID generation from file names
-- Validates existing frontmatter structure
+- Preserves existing frontmatter unchanged
 
 ### 📝 Formatting Normalization
 - Consistent line endings (LF)

@@ -14,7 +14,7 @@ export interface TextRange {
 }
 
 /**
- * Detect code blocks (fenced and indented) in content
+ * Detect fenced code blocks (```...```) in content
  */
 export function detectCodeBlocks(content: string): TextRange[] {
 	const ranges: TextRange[] = [];

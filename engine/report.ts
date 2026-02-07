@@ -96,21 +96,21 @@ export function generateChangeReport(
 
 /**
  * Extract frontmatter from content
+ * Supports both LF and CRLF line endings
  */
 function extractFrontmatter(content: string): string | null {
 	const trimmed = content.trimStart();
-	if (!trimmed.startsWith('---')) {
+	
+	// Require an opening frontmatter fence on the first line and a closing fence
+	// on its own line, supporting both LF and CRLF line endings.
+	const frontmatterMatch = trimmed.match(/^---\r?\n([\s\S]*?)\r?\n---(\r?\n|$)/);
+	
+	if (!frontmatterMatch) {
 		return null;
 	}
 	
-	const afterFirst = trimmed.slice(3);
-	const endIndex = afterFirst.indexOf('\n---');
-	
-	if (endIndex === -1) {
-		return null;
-	}
-	
-	return afterFirst.slice(0, endIndex);
+	// Group 1 contains the content between the opening and closing fences.
+	return frontmatterMatch[1];
 }
 
 /**

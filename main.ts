@@ -109,7 +109,8 @@ export default class VaultLinterPlugin extends Plugin {
 	}
 
 	/**
-	 * Normalize a folder (prompt user to select)
+	 * Normalize the folder of the currently active file.
+	 * The user selects the folder by opening a file within it.
 	 */
 	async normalizeFolder() {
 		// Get current active file to determine folder
