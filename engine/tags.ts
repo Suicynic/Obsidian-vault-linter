@@ -1,8 +1,8 @@
-import { VaultLinterSettings } from './settings';
+import { VaultLinterSettings } from '../settings';
 
 /**
  * Tag rules module
- * Enforces consistent tag formatting
+ * Enforces consistent tag formatting and merging
  */
 export class TagRules {
 	settings: VaultLinterSettings;
@@ -58,7 +58,7 @@ export class TagRules {
 	}
 
 	/**
-	 * Apply tag rules to content
+	 * Apply tag rules to content (deterministic tag merging)
 	 */
 	enforce(content: string): string {
 		if (!this.settings.enforceTagRules) {

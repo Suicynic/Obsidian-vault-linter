@@ -1,7 +1,7 @@
-import { VaultLinterSettings } from './settings';
+import { VaultLinterSettings } from '../settings';
 
 /**
- * Wikilink insertion module
+ * Backlinks (wikilink) insertion module
  * Ensures safe and consistent wikilink formatting
  */
 export class WikilinkInserter {
@@ -60,7 +60,7 @@ export class WikilinkInserter {
 	}
 
 	/**
-	 * Validate and normalize wikilinks in content
+	 * Validate and normalize wikilinks in content (safe backlink insertion)
 	 */
 	normalize(content: string): string {
 		if (!this.settings.safeWikilinkInsertion) {

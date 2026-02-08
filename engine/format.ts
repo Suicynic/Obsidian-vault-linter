@@ -1,4 +1,4 @@
-import { VaultLinterSettings } from './settings';
+import { VaultLinterSettings } from '../settings';
 
 /**
  * Formatting normalization module

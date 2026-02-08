@@ -1,8 +1,8 @@
-import { VaultLinterSettings } from './settings';
+import { VaultLinterSettings } from '../settings';
 
 /**
  * Frontmatter enforcement module
- * Ensures all notes have valid YAML frontmatter
+ * Ensures all notes have valid YAML frontmatter with proper schema and ordering
  */
 export class FrontmatterEnforcer {
 	settings: VaultLinterSettings;
@@ -41,7 +41,8 @@ export class FrontmatterEnforcer {
 	}
 
 	/**
-	 * Generate frontmatter from template
+	 * Generate frontmatter from template with proper field ordering
+	 * Schema: id, title, date, tags (in that order)
 	 */
 	generateFrontmatter(fileName: string): string {
 		if (!this.settings.enforceFrontmatter) {
@@ -50,8 +51,10 @@ export class FrontmatterEnforcer {
 
 		const date = new Date().toISOString().split('T')[0];
 		const title = fileName.replace(/\.md$/, '');
+		const id = this.generateId(title);
 
 		let frontmatter = this.settings.frontmatterTemplate;
+		frontmatter = frontmatter.replace(/{{id}}/g, id);
 		frontmatter = frontmatter.replace(/{{title}}/g, title);
 		frontmatter = frontmatter.replace(/{{date}}/g, date);
 
@@ -64,6 +67,17 @@ export class FrontmatterEnforcer {
 		}
 
 		return frontmatter;
+	}
+
+	/**
+	 * Generate a deterministic ID from the title
+	 */
+	private generateId(title: string): string {
+		// Convert to lowercase, replace spaces and special chars with hyphens
+		return title
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, '-')
+			.replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
 	}
 
 	/**
